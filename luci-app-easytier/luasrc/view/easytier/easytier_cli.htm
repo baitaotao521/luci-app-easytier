@@ -1,695 +1,155 @@
-<%
-local uci = require 'luci.model.uci'.cursor()
--%>
-
 <style>
-:root {
-	--card-bg: #ffffff;
-	--card-shadow: rgba(0,0,0,0.1);
-	--text-primary: #2c3e50;
-	--text-secondary: #7f8c8d;
-	--border-color: #ecf0f1;
-	--tab-active: #3498db;
-	--tab-hover: #f8f9fa;
-	--success: #27ae60;
-	--warning: #f39c12;
-	--error: #e74c3c;
-	--gradient-bg: var(--card-bg);
-}
-
-@media (prefers-color-scheme: dark) {
-	:root {
-		--card-bg: #2c3e50;
-		--card-shadow: rgba(0,0,0,0.3);
-		--text-primary: #ecf0f1;
-		--text-secondary: #bdc3c7;
-		--border-color: #34495e;
-		--tab-active: #3498db;
-		--tab-hover: #34495e;
-		--gradient-bg: var(--card-bg);
-	}
-}
-
-.et-conninfo-container {
+.et-connections {
+	--card-bg: #fff;
+	--tab-hover: #f8fafc;
+	--text-primary: #1e293b;
+	--text-secondary: #64748b;
+	--border-color: #e2e8f0;
+	--tab-active: #0f766e;
+	--error: #b91c1c;
+	color: var(--text-primary);
 	background: var(--card-bg);
-	border-radius: 16px;
-	box-shadow: 0 8px 32px var(--card-shadow);
 	border: 1px solid var(--border-color);
-	margin: 20px 0 20px 0;
+	border-radius: 14px;
+	margin: 20px 0;
 	overflow: hidden;
-	backdrop-filter: blur(10px);
-	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-
-.et-conninfo-container:hover {
-	transform: translateY(-2px);
-	box-shadow: 0 12px 40px var(--card-shadow);
-}
-
-.et-conninfo-header {
-	background: var(--card-bg);
-	padding: 12px 20px;
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	border-bottom: 1px solid var(--border-color);
-}
-
-.et-conninfo-title {
-	font-size: 16px;
-	font-weight: 600;
-	color: var(--text-primary);
-}
-
-.et-refresh-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	padding: 6px 12px;
-	background: var(--tab-active);
-	color: white;
-	border: 1px solid var(--tab-active);
-	border-radius: 6px;
-	cursor: pointer;
-	font-size: 13px;
-	font-weight: 500;
-	transition: all 0.2s;
-}
-
-.et-refresh-btn:hover {
-	opacity: 0.9;
-}
-
-.et-refresh-btn:active {
-	transform: scale(0.95);
-}
-
-.et-refresh-btn:disabled {
-	opacity: 0.6;
-	cursor: not-allowed;
-	transform: none;
-}
-
-.et-refresh-icon {
-	transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.et-refresh-btn.loading .et-refresh-icon {
-	animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
-}
-
-.et-tabs-container {
-	background: var(--card-bg);
-	border-bottom: 1px solid var(--border-color);
-	overflow-x: auto;
-}
-
-.et-tabs-container::-webkit-scrollbar {
-	height: 6px;
-}
-
-.et-tabs-container::-webkit-scrollbar-track {
-	background: var(--border-color);
-	border-radius: 3px;
-}
-
-.et-tabs-container::-webkit-scrollbar-thumb {
-	background: var(--text-secondary);
-	border-radius: 3px;
-}
-
-.et-tabs-container::-webkit-scrollbar-thumb:hover {
-	background: var(--text-primary);
-}
-
-.et-tabs {
-	display: flex;
-	min-width: max-content;
-}
-
-.et-tab {
-	padding: 16px 24px;
-	cursor: pointer;
-	border: none;
-	background: none;
-	color: var(--text-secondary);
-	font-size: 14px;
-	font-weight: 600;
-	white-space: nowrap;
-	border-bottom: 3px solid transparent;
-	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-	position: relative;
-	overflow: hidden;
-}
-
-.et-tab::before {
-	content: '';
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	background: var(--tab-active);
-	opacity: 0;
-	transition: opacity 0.3s ease;
-}
-
-.et-tab:hover::before {
-	opacity: 0.05;
-}
-
-.et-tab:hover {
-	color: var(--tab-active);
-	background: var(--tab-hover);
-}
-
-.et-tab.active {
-	color: var(--tab-active);
-	border-bottom-color: var(--tab-active);
-	background: var(--tab-hover);
-}
-
-.et-tab.active::before {
-	opacity: 0.1;
-}
-
-.et-tab-content {
-	display: none;
-	padding: 24px;
-	min-height: 200px;
-	animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.et-tab-content.active {
-	display: block;
-}
-
-@keyframes fadeIn {
-	from { opacity: 0; transform: translateY(10px); }
-	to { opacity: 1; transform: translateY(0); }
-}
-
-.et-loading {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 40px;
-	color: var(--text-secondary);
-}
-
-.et-loading-spinner {
-	width: 24px;
-	height: 24px;
-	border: 3px solid var(--border-color);
-	border-top: 3px solid var(--tab-active);
-	border-radius: 50%;
-	animation: spin 1s linear infinite;
-	margin-right: 12px;
-}
-
-.et-table-container {
-	overflow-x: auto;
-	border-radius: 12px;
-	border: 1px solid var(--border-color);
-	background: var(--card-bg);
-}
-
-.et-table {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: 13px;
-	border: 2px solid var(--border-color);
-}
-
-.et-table th {
-	background: #f0f0f0;
-	color: var(--text-primary);
-	padding: 10px 12px;
-	text-align: center;
-	font-weight: 600;
-	border: 2px solid #ccc;
-	white-space: nowrap;
-}
-
-.et-table td {
-	padding: 8px 12px;
-	text-align: center;
-	border: 2px solid #ddd;
-	color: var(--text-primary);
-	white-space: nowrap;
-	background: #ffffff;
-}
-
-/* 斑马色 - 数据行（对调奇偶） */
-.et-table tr:nth-child(2n) td {
-	background: #ffffff;
-}
-
-.et-table tr:nth-child(2n+1) td {
-	background: #f5f5f5;
-}
-
-/* 暗色模式 */
 @media (prefers-color-scheme: dark) {
-	.et-table th {
-		background: #2a2a2a;
-		border: 2px solid #444;
-	}
-	
-	.et-table td {
-		background: transparent;
-		border: 2px solid #333;
-	}
-	
-	.et-table tr:nth-child(2n) td {
-		background: transparent;
-	}
-	
-	.et-table tr:nth-child(2n+1) td {
-		background: rgba(255,255,255,0.05);
+	.et-connections {
+		--card-bg: #101c2b;
+		--tab-hover: #172536;
+		--text-primary: #e2e8f0;
+		--text-secondary: #94a3b8;
+		--border-color: #29384a;
+		--tab-active: #5eead4;
+		--error: #fca5a5;
 	}
 }
-
-.et-table tr:hover td {
-	background: rgba(52, 152, 219, 0.1);
+.et-connections *, .et-connections *:before, .et-connections *:after { box-sizing: border-box; }
+.et-connections .et-conninfo-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 24px; }
+.et-connections .et-conninfo-title { margin: 0; color: var(--text-primary); font-size: 18px; font-weight: 650; line-height: 1.4; }
+.et-connections .et-conninfo-description { margin: 5px 0 0; color: var(--text-secondary); font-size: 12px; }
+.et-connections .et-conninfo-actions { display: flex; align-items: center; gap: 16px; }
+.et-connections .et-auto-refresh { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; cursor: pointer; margin: 0; }
+.et-connections .et-auto-refresh input { margin: 0; accent-color: var(--tab-active); }
+.et-connections .et-refresh-btn, .et-connections .et-copy-btn, .et-connections .et-page-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; margin: 0; padding: 7px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg); color: var(--text-primary); font-size: 12px; font-weight: 600; line-height: 1.4; cursor: pointer; box-shadow: none; text-shadow: none; }
+.et-connections .et-refresh-btn { background: var(--tab-active); border-color: transparent; color: #fff; }
+.et-connections button:hover { opacity: .85; }
+.et-connections button:disabled { opacity: .45; cursor: default; }
+.et-connections button:focus-visible, .et-connections input:focus-visible { outline: 2px solid var(--tab-active); outline-offset: 3px; }
+.et-connections .et-refresh-btn.loading .et-refresh-icon { animation: et-conn-spin 1s linear infinite; }
+@keyframes et-conn-spin { to { transform: rotate(360deg); } }
+.et-connections .et-tabs-container { padding: 0 24px; background: var(--tab-hover); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); overflow-x: auto; }
+.et-connections .et-tabs { display: flex; width: max-content; min-width: 100%; gap: 22px; }
+.et-connections .et-tab { flex-shrink: 0; margin: 0; padding: 15px 0 13px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--text-secondary); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: nowrap; cursor: pointer; box-shadow: none; text-shadow: none; }
+.et-connections .et-tab.active { color: var(--tab-active); border-bottom-color: var(--tab-active); font-weight: 650; }
+.et-connections .et-update-bar { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 9px 24px 0; color: var(--text-secondary); font-size: 11px; }
+.et-connections .et-update-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--tab-active); }
+.et-connections .et-update-bar[data-state="error"] { color: var(--error); }
+.et-connections .et-update-bar[data-state="error"] .et-update-dot { background: var(--error); }
+.et-connections .et-tab-content { display: none; min-height: 180px; padding: 16px 24px 24px; }
+.et-connections .et-tab-content.active { display: block; }
+.et-connections .et-loading { display: flex; justify-content: center; align-items: center; min-height: 150px; gap: 10px; color: var(--text-secondary); font-size: 13px; }
+.et-connections .et-loading-spinner { width: 18px; height: 18px; border: 2px solid var(--border-color); border-top-color: var(--tab-active); border-radius: 50%; animation: et-conn-spin 1s linear infinite; }
+.et-connections .et-peer-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.et-connections .et-search { display: flex; align-items: center; gap: 8px; width: 320px; max-width: 100%; padding: 0 11px; border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-secondary); background: var(--tab-hover); }
+.et-connections .et-search input { width: 100%; min-width: 0; height: 36px; padding: 0; margin: 0; background: transparent; color: var(--text-primary); border: 0; border-radius: 0; font: inherit; font-size: 12px; box-shadow: none; }
+.et-connections .et-search input:focus { outline: none; }
+.et-connections .et-search:focus-within { border-color: var(--tab-active); }
+.et-connections .et-peer-count { color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.et-connections .et-table-container { width: 100%; overflow-x: auto; border: 1px solid var(--border-color); border-radius: 10px; }
+.et-connections #et_peer_body .et-table-container { max-height: 480px; }
+.et-connections #et_peer_table th { position: sticky; top: 0; z-index: 1; }
+.et-connections .et-table { width: 100%; margin: 0; border: 0; border-collapse: collapse; font-size: 12px; }
+.et-connections .et-table th, .et-connections .et-table td { padding: 12px 14px; border: 0; border-bottom: 1px solid var(--border-color); text-align: left; white-space: nowrap; color: var(--text-primary); background: transparent; line-height: 1.5; }
+.et-connections .et-table th { background: var(--tab-hover); color: var(--text-secondary); font-size: 11px; font-weight: 600; }
+.et-connections .et-table tbody tr:last-child td { border-bottom: 0; }
+.et-connections .et-table tbody tr:hover td { background: var(--tab-hover); }
+.et-connections .et-table .et-peer-address { font-family: "SFMono-Regular", Consolas, monospace; color: var(--tab-active); }
+.et-connections .et-table .et-peer-name { font-weight: 600; }
+.et-connections .et-table .et-peer-number { font-variant-numeric: tabular-nums; }
+.et-connections .et-table.node-table td:first-child, .et-connections .et-table.two-column td:first-child { width: 25%; min-width: 140px; color: var(--text-secondary); background: var(--tab-hover); }
+.et-connections .et-peer-pager { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 16px; }
+.et-connections .et-page-info { color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.et-connections .et-page-actions { display: flex; align-items: center; gap: 8px; }
+.et-connections .et-empty { margin: 0; padding: 48px 20px; color: var(--text-secondary); font-size: 13px; font-style: normal; text-align: center; }
+.et-connections .et-error { margin: 0; padding: 24px; border: 1px solid var(--border-color); border-radius: 10px; color: var(--error); font-size: 13px; overflow-wrap: anywhere; }
+.et-connections .et-pre { margin: 0; padding: 18px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--tab-hover); color: var(--text-primary); font: 12px/1.7 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; overflow-x: auto; }
+.et-connections .et-command-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.et-connections .et-project-footer { display: flex; flex-wrap: wrap; gap: 18px; padding: 14px 24px; border-top: 1px solid var(--border-color); background: var(--tab-hover); }
+.et-connections .et-project-footer a { color: var(--text-secondary); font-size: 11px; text-decoration: none; }
+.et-connections .et-project-footer a:hover { color: var(--tab-active); }
+@media (prefers-color-scheme: dark) { .et-connections .et-refresh-btn { color: #101c2b; } }
+@media (max-width: 600px) {
+	.et-connections .et-conninfo-header { padding: 18px 16px; gap: 14px; }
+	.et-connections .et-conninfo-actions { width: 100%; justify-content: space-between; }
+	.et-connections .et-tabs-container { padding: 0 16px; }
+	.et-connections .et-tabs { gap: 20px; }
+	.et-connections .et-update-bar { padding-left: 16px; padding-right: 16px; }
+	.et-connections .et-tab-content { padding: 14px 16px 18px; }
+	.et-connections .et-search { width: 100%; }
+	.et-connections .et-table th, .et-connections .et-table td { padding: 10px 12px; }
+	.et-connections .et-project-footer { padding: 14px 16px; }
 }
-
-/* Node信息表格特殊样式 - 左侧表头 */
-.et-table.node-table th:first-child,
-.et-table.node-table td:first-child {
-	background: #f0f0f0 !important;
-	font-weight: 600;
-	text-align: left;
-	border-right: 3px solid #999;
-}
-
-.et-table.node-table td:not(:first-child) {
-	text-align: left;
-}
-
-/* 两列表格 - 左侧作为表头 */
-.et-table.two-column td:first-child {
-	background: #e8e8e8 !important;
-	font-weight: 600;
-	text-align: left;
-	border-right: 3px solid #999 !important;
-}
-
-.et-table.two-column tr:nth-child(2n) td:last-child {
-	background: #ffffff !important;
-}
-
-.et-table.two-column tr:nth-child(2n+1) td:last-child {
-	background: #f5f5f5 !important;
-}
-	text-align: left;
-	border-right: 3px solid #ccc !important;
-}
-
-.et-table.two-column tr:nth-child(2n) td:last-child {
-	background: #f5f5f5 !important;
-}
-
-.et-table.two-column tr:nth-child(2n+1) td:last-child {
-	background: #ffffff !important;
-}
-
-@media (prefers-color-scheme: dark) {
-	.et-table.node-table th:first-child,
-	.et-table.node-table td:first-child,
-	.et-table.two-column td:first-child {
-		background: #2a2a2a !important;
-		border-right: 3px solid #444 !important;
-	}
-	
-	.et-table.two-column tr:nth-child(2n) td:last-child {
-		background: rgba(255,255,255,0.05) !important;
-	}
-	
-	.et-table.two-column tr:nth-child(2n+1) td:last-child {
-		background: transparent !important;
-	}
-}
-	background: var(--tab-hover);
-	font-weight: 600;
-	text-align: left;
-	border-right: 2px solid var(--border-color);
-}
-
-.et-table.node-table td:not(:first-child) {
-	text-align: left;
-}
-
-.et-empty {
-	text-align: center;
-	color: var(--text-secondary);
-	padding: 60px 20px;
-	font-size: 16px;
-	font-style: italic;
-}
-
-.et-error {
-	color: var(--error);
-	padding: 20px;
-	text-align: center;
-	background: rgba(231, 76, 60, 0.1);
-	border-radius: 12px;
-	margin: 16px;
-	border: 1px solid rgba(231, 76, 60, 0.2);
-}
-
-.et-pre {
-	background: var(--tab-hover);
-	border: 1px solid var(--border-color);
-	padding: 16px;
-	border-radius: 12px;
-	white-space: pre-wrap;
-	word-wrap: break-word;
-	overflow-wrap: anywhere;
-	word-break: break-word;
-	font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-	font-size: 13px;
-	color: var(--text-primary);
-	overflow-x: auto;
-	line-height: 1.5;
-}
-
-.et-command-panel {
-	position: relative;
-}
-
-.et-command-toolbar {
-	display: flex;
-	justify-content: flex-end;
-	margin-bottom: 8px;
-}
-
-.et-copy-btn {
-	display: inline-flex;
-	align-items: center;
-	padding: 5px 10px;
-	background: var(--tab-active);
-	color: #fff;
-	border: 1px solid var(--tab-active);
-	border-radius: 6px;
-	cursor: pointer;
-	font-size: 12px;
-	font-weight: 500;
-	line-height: 1.4;
-}
-
-.et-copy-btn:hover {
-	opacity: 0.9;
-}
-
-@media (max-width: 768px) {
-	.et-conninfo-header {
-		flex-direction: column;
-		gap: 16px;
-		align-items: center;
-		text-align: center;
-	}
-	
-	.et-tab {
-		padding: 12px 16px;
-		font-size: 13px;
-	}
-	
-	.et-tab-content {
-		padding: 16px;
-	}
-	
-	.et-table th,
-	.et-table td {
-		padding: 8px 12px;
-		font-size: 12px;
-	}
-}
-
-/* Contributors Section */
-.et-contributors-section {
-	margin: 20px 0 20px 0;
-	padding: 20px;
-	background: var(--card-bg);
-	border-radius: 16px;
-	box-shadow: 0 8px 32px var(--card-shadow);
-	border: 1px solid var(--border-color);
-	backdrop-filter: blur(10px);
-	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-	position: relative;
-}
-
-.et-contributors-section:hover {
-	transform: translateY(-2px);
-	box-shadow: 0 12px 40px var(--card-shadow);
-}
-
-.et-contributors-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 16px;
-}
-
-.et-contributors-title {
-	font-size: 16px;
-	font-weight: 600;
-	color: var(--text-primary);
-}
-
-.et-contributors-pagination {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	font-size: 13px;
-	color: var(--text-secondary);
-}
-
-.et-contributors-dots {
-	display: flex;
-	gap: 6px;
-}
-
-.et-contributors-dot {
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: var(--border-color);
-	cursor: pointer;
-	transition: all 0.3s ease;
-}
-
-.et-contributors-dot.active {
-	background: var(--tab-active);
-	width: 24px;
-	border-radius: 4px;
-}
-
-.et-contributors-dot:hover {
-	background: var(--tab-active);
-	opacity: 0.7;
-}
-
-.et-contributors-wrapper {
-	position: relative;
-	overflow: hidden;
-	min-height: 60px;
-}
-
-.et-contributors-container {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	justify-content: flex-start;
-	align-items: center;
-	opacity: 0;
-	transform: translateX(20px);
-	transition: opacity 0.8s ease, transform 0.8s ease;
-}
-
-.et-contributors-container.active {
-	opacity: 1;
-	transform: translateX(0);
-}
-
-.et-contributors-container.exit {
-	opacity: 0;
-	transform: translateX(-20px);
-}
-
-.et-contributors-container a {
-	display: inline-block;
-	transition: transform 0.2s ease;
-}
-
-.et-contributors-container a:hover {
-	transform: scale(1.1);
-}
-
-.et-contributors-container img {
-	width: 40px;
-	height: 40px;
-	border-radius: 50%;
-	border: 2px solid var(--border-color);
-	transition: border-color 0.2s ease;
-}
-
-.et-contributors-container img:hover {
-	border-color: var(--tab-active);
-}
-
-@media (max-width: 768px) {
-	.et-contributors-section {
-		padding: 16px;
-		margin: 16px 0 16px 0;
-	}
-	
-	.et-contributors-section:hover {
-		transform: none;
-	}
-	
-	.et-contributors-header {
-		flex-direction: column;
-		gap: 12px;
-		align-items: flex-start;
-	}
-	
-	.et-contributors-pagination {
-		width: 100%;
-		justify-content: space-between;
-	}
-	
-	.et-contributors-container {
-		justify-content: center;
-	}
-	
-	.et-contributors-container img {
-		width: 36px;
-		height: 36px;
-	}
-}
+@media (prefers-reduced-motion: reduce) { .et-connections .et-loading-spinner, .et-connections .et-refresh-btn.loading .et-refresh-icon { animation: none; } }
 </style>
 
-<div class="et-conninfo-container">
+<section class="et-conninfo-container et-connections" aria-labelledby="et_connections_title">
 	<div class="et-conninfo-header">
-		<div class="et-conninfo-title"><%:Connection Information%></div>
-		<button class="et-refresh-btn" id="et_conninfo_refresh" onclick="refreshConnInfo(); return false;">
-			<svg class="et-refresh-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-			</svg>
-			<span><%:Refresh%></span>
-		</button>
+		<div>
+			<h2 class="et-conninfo-title" id="et_connections_title"><%:Connected Devices%></h2>
+			<p class="et-conninfo-description"><%:Live connections, routes and network diagnostics.%></p>
+		</div>
+		<div class="et-conninfo-actions">
+			<label class="et-auto-refresh"><input type="checkbox" id="et_conninfo_auto" checked> <%:Auto Refresh%></label>
+			<button type="button" class="et-refresh-btn" id="et_conninfo_refresh" onclick="refreshConnInfo();">
+				<svg class="et-refresh-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 2M4 17l2 2a8 8 0 0 0 13-2"/></svg>
+				<span><%:Refresh%></span>
+			</button>
+		</div>
 	</div>
-	
 	<div class="et-tabs-container">
-		<div class="et-tabs">
-			<button class="et-tab active" data-tab="node"><%:Node Info%></button>
-			<button class="et-tab" data-tab="peer"><%:Peer List%></button>
-			<button class="et-tab" data-tab="route"><%:Route Info%></button>
-			<button class="et-tab" data-tab="connector"><%:Connector%></button>
-			<button class="et-tab" data-tab="stun"><%:STUN%></button>
-			<button class="et-tab" data-tab="peercenter"><%:Peer Center%></button>
-			<button class="et-tab" data-tab="vpnportal"><%:VPN Portal%></button>
-			<button class="et-tab" data-tab="proxy"><%:Proxy%></button>
-			<button class="et-tab" data-tab="acl"><%:ACL%></button>
-			<button class="et-tab" data-tab="mappedlistener"><%:Mapped Listener%></button>
-			<button class="et-tab" data-tab="stats"><%:Statistics%></button>
-			<button class="et-tab" data-tab="cmdline"><%:Command Line%></button>
+		<div class="et-tabs" role="tablist" aria-label="<%:Connection Information%>">
+			<button type="button" class="et-tab active" id="et_tab_peer" role="tab" aria-selected="true" aria-controls="tab_peer" data-tab="peer"><%:Peer List%></button>
+			<button type="button" class="et-tab" id="et_tab_node" role="tab" aria-selected="false" aria-controls="tab_node" tabindex="-1" data-tab="node"><%:Node Info%></button>
+			<button type="button" class="et-tab" id="et_tab_route" role="tab" aria-selected="false" aria-controls="tab_route" tabindex="-1" data-tab="route"><%:Route Info%></button>
+			<button type="button" class="et-tab" id="et_tab_connector" role="tab" aria-selected="false" aria-controls="tab_connector" tabindex="-1" data-tab="connector"><%:Connector%></button>
+			<button type="button" class="et-tab" id="et_tab_stun" role="tab" aria-selected="false" aria-controls="tab_stun" tabindex="-1" data-tab="stun"><%:STUN%></button>
+			<button type="button" class="et-tab" id="et_tab_peercenter" role="tab" aria-selected="false" aria-controls="tab_peercenter" tabindex="-1" data-tab="peercenter"><%:Peer Center%></button>
+			<button type="button" class="et-tab" id="et_tab_vpnportal" role="tab" aria-selected="false" aria-controls="tab_vpnportal" tabindex="-1" data-tab="vpnportal"><%:VPN Portal%></button>
+			<button type="button" class="et-tab" id="et_tab_proxy" role="tab" aria-selected="false" aria-controls="tab_proxy" tabindex="-1" data-tab="proxy"><%:Proxy%></button>
+			<button type="button" class="et-tab" id="et_tab_acl" role="tab" aria-selected="false" aria-controls="tab_acl" tabindex="-1" data-tab="acl"><%:ACL%></button>
+			<button type="button" class="et-tab" id="et_tab_mappedlistener" role="tab" aria-selected="false" aria-controls="tab_mappedlistener" tabindex="-1" data-tab="mappedlistener"><%:Mapped Listener%></button>
+			<button type="button" class="et-tab" id="et_tab_stats" role="tab" aria-selected="false" aria-controls="tab_stats" tabindex="-1" data-tab="stats"><%:Statistics%></button>
+			<button type="button" class="et-tab" id="et_tab_cmdline" role="tab" aria-selected="false" aria-controls="tab_cmdline" tabindex="-1" data-tab="cmdline"><%:Command Line%></button>
 		</div>
 	</div>
-	
-	<div class="et-tab-content active" id="tab_node">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
+	<div class="et-update-bar" id="et_conninfo_update" role="status"><span class="et-update-dot" aria-hidden="true"></span><span id="et_conninfo_updated"><%:Collecting data...%></span></div>
+	<div class="et-tab-content active" id="tab_peer" role="tabpanel" aria-labelledby="et_tab_peer" aria-busy="true">
+		<div class="et-peer-toolbar">
+			<label class="et-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input type="search" id="et_peer_search" placeholder="<%:Search devices, addresses or IDs%>" aria-label="<%:Search devices, addresses or IDs%>"></label>
+			<span class="et-peer-count" id="et_peer_count"></span>
+		</div>
+		<div id="et_peer_body"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+		<div class="et-peer-pager" id="et_peer_pager" style="display:none;">
+			<span class="et-page-info" id="et_peer_page_info"></span>
+			<div class="et-page-actions"><button type="button" class="et-page-btn" id="et_peer_prev"><%:Previous%></button><button type="button" class="et-page-btn" id="et_peer_next"><%:Next%></button></div>
 		</div>
 	</div>
-	<div class="et-tab-content" id="tab_peer">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_route">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_connector">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_stun">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_peercenter">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_vpnportal">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_proxy">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_acl">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_mappedlistener">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_stats">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-	<div class="et-tab-content" id="tab_cmdline">
-		<div class="et-loading">
-			<div class="et-loading-spinner"></div>
-			<%:Collecting data...%>
-		</div>
-	</div>
-</div>
-
-<!-- Contributors Section -->
-<div id="contributors-section" class="et-contributors-section" style="display: none;">
-	<div class="et-contributors-header">
-		<div class="et-contributors-title"><%:Contributors%></div>
-		<div class="et-contributors-pagination">
-			<span id="contributors-page-info"></span>
-			<div id="contributors-dots" class="et-contributors-dots"></div>
-		</div>
-	</div>
-	<div class="et-contributors-wrapper">
-		<div id="contributors" class="et-contributors-container"></div>
-	</div>
-</div>
+	<div class="et-tab-content" id="tab_node" role="tabpanel" aria-labelledby="et_tab_node" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_route" role="tabpanel" aria-labelledby="et_tab_route" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_connector" role="tabpanel" aria-labelledby="et_tab_connector" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_stun" role="tabpanel" aria-labelledby="et_tab_stun" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_peercenter" role="tabpanel" aria-labelledby="et_tab_peercenter" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_vpnportal" role="tabpanel" aria-labelledby="et_tab_vpnportal" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_proxy" role="tabpanel" aria-labelledby="et_tab_proxy" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_acl" role="tabpanel" aria-labelledby="et_tab_acl" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_mappedlistener" role="tabpanel" aria-labelledby="et_tab_mappedlistener" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_stats" role="tabpanel" aria-labelledby="et_tab_stats" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<div class="et-tab-content" id="tab_cmdline" role="tabpanel" aria-labelledby="et_tab_cmdline" aria-hidden="true"><div class="et-loading"><div class="et-loading-spinner"></div><%:Collecting data...%></div></div>
+	<footer class="et-project-footer"><a href="https://github.com/EasyTier/EasyTier" target="_blank" rel="noopener noreferrer">EasyTier · GitHub</a><a href="https://easytier.cn" target="_blank" rel="noopener noreferrer"><%:Official Documentation%></a><a href="https://github.com/EasyTier/EasyTier/graphs/contributors" target="_blank" rel="noopener noreferrer"><%:Contributors%></a></footer>
+</section>
 
 <script type="text/javascript">//<![CDATA[
 var translations = {
@@ -940,15 +400,13 @@ var translations = {
 	"to_instance_id": "<%:To Instance ID%>"
 };
 
-var currentTab = 'node';
-
-// 连接信息分区表：id 为 TAB 元素后缀，key 为后端 api_conninfo?parts= 使用的分区名
+var currentTab = 'peer';
 var connInfoSections = [
-	{id: 'node', key: 'node'},
 	{id: 'peer', key: 'peer'},
+	{id: 'node', key: 'node'},
 	{id: 'route', key: 'route'},
 	{id: 'connector', key: 'connector'},
-	{id: 'stun', key: 'stun'},
+	{id: 'stun', key: 'stun', interval: 60000},
 	{id: 'peercenter', key: 'peer_center'},
 	{id: 'vpnportal', key: 'vpn_portal'},
 	{id: 'proxy', key: 'proxy'},
@@ -957,14 +415,19 @@ var connInfoSections = [
 	{id: 'stats', key: 'stats'},
 	{id: 'cmdline', key: 'cmdline'}
 ];
-
-// 已经成功加载过的分区，切换 TAB 时命中就不再请求
-var connInfoLoaded = {};
-// 待请求的分区队列：同一时刻只允许一个请求在跑，避免一次性起一堆 easytier-cli 进程
-var connInfoQueue = [];
-var connInfoBusy = false;
-// 最近一次响应中的配置文件内容，供"命令行"分区直接使用
+var connInfoUrl = '<%=url("admin", "vpn", "easytier", "api_conninfo")%>';
+var connSnapshotKey = 'easytier-peer:' + connInfoUrl;
+var connInfoRequests = 0;
+var connInfoTimer = null;
+var connInfoDisposed = false;
+var connInfoPendingForce = null;
+var connInfoPendingTab = null;
 var lastConfigFile = null;
+var peerModel = null;
+var peerPage = 0;
+var peerPageSize = 50;
+var peerQuery = '';
+var peerSearchTimer = null;
 
 // ACL 统计是 core 直接输出的英文结构体文本（core 侧没有多语言），
 // 字段名单独放在这里精确匹配，避免 name / bytes 这类通用词影响其它卡片
@@ -1087,7 +550,7 @@ function parseTable(content, tabName) {
 		return '<div class="et-empty"><%:No data available%></div>';
 	}
 	
-	if (content.indexOf('错误：') === 0) {
+	if (content.indexOf('错误：') === 0 || content.indexOf('<%:Error: Program not running! Please start the program and refresh%>') === 0) {
 		return '<div class="et-error">' + escapeHtml(content) + '</div>';
 	}
 	
@@ -1114,7 +577,7 @@ function parseTable(content, tabName) {
 		// 配置文件内容随 cmdline 分区一起返回，这里不再单独请求一次 api_conninfo
 		if ((content.indexOf('--config-file') !== -1 || content.match(/-c\s+\//)) && lastConfigFile) {
 			html += '<div class="et-pre" style="margin-top:16px;border-top:2px solid var(--border-color);padding-top:16px;">' +
-				'<div style="font-weight:600;margin-bottom:8px;color:var(--primary-color);">' +
+				'<div style="font-weight:600;margin-bottom:8px;color:var(--tab-active);">' +
 					escapeHtml(tr('Configuration File Content')) + ':' +
 				'</div>' +
 				'<pre style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;">' +
@@ -1178,9 +641,6 @@ function parseTable(content, tabName) {
 			return match.replace('Listener', tr('Listener'));
 		});
 		
-		// 处理PublicServer_包装为标签样式
-		translatedContent = translatedContent.replace(/PublicServer_/g, '<span style="background:#e3f2fd;color:#1976d2;padding:2px 4px;border-radius:4px;font-size:11px;font-weight:500;">' + tr('PublicServer_') + '</span>');
-		
 		// 处理特殊格式
 		translatedContent = translatedContent.replace(/###############\s*([^#]+)\s*###############/g, function(match, p1) {
 			return '############### ' + tr(p1.trim()) + ' ###############';
@@ -1191,11 +651,10 @@ function parseTable(content, tabName) {
 			translatedContent = translateAclStats(translatedContent);
 		}
 
-		return '<div class="et-pre">' + (translatedContent.indexOf('<svg') !== -1 || translatedContent.indexOf('<span') !== -1 ? translatedContent : escapeHtml(translatedContent)) + '</div>';
+		return '<div class="et-pre">' + escapeHtml(translatedContent) + '</div>';
 	}
 	
 	var isNodeTable = tabName === 'node';
-	var isCmdlineTab = tabName === 'cmdline';
 	
 	// 检测列数来判断是否为两列表格
 	var firstLine = lines[0];
@@ -1216,7 +675,6 @@ function parseTable(content, tabName) {
 	var tableClass = isNodeTable ? 'et-table node-table' : (isTwoColumn ? 'et-table two-column' : 'et-table');
 	var html = '<div class="et-table-container"><table class="' + tableClass + '">';
 	var rowIndex = 0;
-	var hasHeader = false;
 	
 	for (var i = 0; i < lines.length; i++) {
 		var line = lines[i];
@@ -1242,32 +700,17 @@ function parseTable(content, tabName) {
 			var tag = (rowIndex === 0 && !isNodeTable && !isTwoColumn) ? 'th' : 'td';
 			var cellContent = cells[k];
 			
-			// 启动参数不翻译
-			if (!isCmdlineTab) {
-				// 处理带编号的Listener
-				if (cellContent.match(/^Listener\s+\d+$/)) {
-					cellContent = cellContent.replace('Listener', tr('Listener'));
-				} else if (cellContent.indexOf('PublicServer_') !== -1) {
-					// 将PublicServer_包装为标签样式
-					cellContent = cellContent.replace(/PublicServer_/g, '<span style="background:#e3f2fd;color:#1976d2;padding:2px 4px;border-radius:4px;font-size:11px;font-weight:500;">' + tr('PublicServer_') + '</span>');
-				} else {
-					// 处理标签内容翻译 (key=value格式)
-					cellContent = cellContent.replace(/(\w+)=([^,\s]+)/g, function(match, key, value) {
-						var translatedKey = translations[key] ? tr(key) : key;
-						var translatedValue = translations[value] ? tr(value) : value;
-						return translatedKey + '=' + translatedValue;
-					});
-					cellContent = tr(cellContent);
-				}
+			if (cellContent.match(/^Listener\s+\d+$/)) {
+				cellContent = cellContent.replace('Listener', tr('Listener'));
+			} else {
+				cellContent = cellContent.replace(/(\w+)=([^,\s]+)/g, function(match, key, value) {
+					return tr(key) + '=' + tr(value);
+				});
+				cellContent = tr(cellContent);
 			}
 			
 			var display = (cellContent === '' || cellContent.trim() === '') ? '-' : cellContent;
-			// 如果包含HTML标签，不进行HTML转义
-			if (display.indexOf('<svg') !== -1 || display.indexOf('<span') !== -1) {
-				html += '<' + tag + '>' + display + '</' + tag + '>';
-			} else {
-				html += '<' + tag + '>' + escapeHtml(display) + '</' + tag + '>';
-			}
+			html += '<' + tag + '>' + escapeHtml(display) + '</' + tag + '>';
 		}
 		html += '</tr>';
 		rowIndex++;
@@ -1277,402 +720,320 @@ function parseTable(content, tabName) {
 	return html;
 }
 
-function switchTab(tabName) {
-	var tabs = document.querySelectorAll('.et-tab');
-	var contents = document.querySelectorAll('.et-tab-content');
-
-	tabs.forEach(function(tab) {
-		tab.classList.remove('active');
-	});
-	contents.forEach(function(content) {
-		content.classList.remove('active');
-	});
-
-	var activeTab = document.querySelector('.et-tab[data-tab="' + tabName + '"]');
-	var activeContent = document.getElementById('tab_' + tabName);
-
-	if (activeTab && activeContent) {
-		activeTab.classList.add('active');
-		activeContent.classList.add('active');
-		currentTab = tabName;
-		// 按需加载：只请求当前显示的分区，没有加载过才发起请求
-		queueConnInfo([tabName], false);
-	}
-}
-
-// 把 TAB 名换算成后端分区名
-function connInfoKeyOfTab(tabName) {
+function connInfoSection(tabName) {
 	for (var i = 0; i < connInfoSections.length; i++) {
-		if (connInfoSections[i].id === tabName) {
-			return connInfoSections[i].key;
-		}
+		if (connInfoSections[i].id === tabName) return connInfoSections[i];
 	}
 	return null;
 }
 
-// 分区加载失败（超时/网络错误）时给出提示，避免加载动画一直转下去
-function reportConnInfoError(keys) {
-	for (var i = 0; i < keys.length; i++) {
-		var sec = null;
-		for (var j = 0; j < connInfoSections.length; j++) {
-			if (connInfoSections[j].key === keys[i]) sec = connInfoSections[j];
-		}
-		if (!sec) continue;
-		var el = document.getElementById('tab_' + sec.id);
-		if (el) {
-			el.innerHTML = '<div class="et-error"><%:Loading timed out. Please click Refresh to try again.%></div>';
-			el.setAttribute('data-loaded', '1');
-		}
-	}
+function setConnText(element, value) {
+	if (element.textContent !== value) element.textContent = value;
 }
 
-// 把分区加入请求队列
-function queueConnInfo(tabNames, force) {
-	var changed = false;
-	for (var i = 0; i < tabNames.length; i++) {
-		var key = connInfoKeyOfTab(tabNames[i]);
-		if (!key) continue;
-		if (!force && connInfoLoaded[key]) continue;
-		if (connInfoQueue.indexOf(key) !== -1) continue;
-		connInfoQueue.push(key);
-		changed = true;
+function parsePeerTable(content) {
+	var lines = content.split(/\r?\n/);
+	var rows = [];
+	for (var i = 0; i < lines.length; i++) {
+		var line = lines[i].trim();
+		if (!line || /^[+\-\s]+$/.test(line)) continue;
+		if (line.charAt(0) !== '|' || line.charAt(line.length - 1) !== '|') return null;
+		var cells = line.slice(1, -1).split('|');
+		var separator = true;
+		for (var j = 0; j < cells.length; j++) {
+			cells[j] = cells[j].trim();
+			if (!/^[-:\s]+$/.test(cells[j])) separator = false;
+		}
+		if (!separator) rows.push(cells);
 	}
-	if (changed) {
-		pumpConnInfoQueue();
-	}
+	if (!rows.length) return null;
+	var headers = rows.shift();
+	var index = [];
+	for (var r = 0; r < rows.length; r++) index.push(rows[r].join(' ').toLowerCase());
+	return {headers: headers, rows: rows, index: index};
 }
 
-// 依次请求队列里的分区，同一时刻只允许一个请求在跑，
-// 避免一次起多个 easytier-cli 进程把路由器拖慢
-function pumpConnInfoQueue() {
-	if (connInfoBusy || connInfoQueue.length === 0) return;
+function renderPeerTable() {
+	if (!peerModel) return;
+	var matches = [];
+	for (var i = 0; i < peerModel.rows.length; i++) {
+		if (!peerQuery || peerModel.index[i].indexOf(peerQuery) !== -1) matches.push(i);
+	}
+	var pages = Math.max(1, Math.ceil(matches.length / peerPageSize));
+	peerPage = Math.max(0, Math.min(peerPage, pages - 1));
+	var start = peerPage * peerPageSize;
+	var count = Math.min(peerPageSize, matches.length - start);
+	var body = document.getElementById('et_peer_body');
+	var table = document.getElementById('et_peer_table');
+	var signature = peerModel.headers.join('\u0000');
+	if (!table || table.etHeaders !== signature) {
+		var container = document.createElement('div');
+		container.className = 'et-table-container';
+		table = document.createElement('table');
+		table.id = 'et_peer_table';
+		table.className = 'et-table';
+		table.setAttribute('aria-label', '<%:Peer List%>');
+		table.etHeaders = signature;
+		var head = table.createTHead().insertRow(-1);
+		for (var h = 0; h < peerModel.headers.length; h++) {
+			var th = document.createElement('th');
+			th.setAttribute('scope', 'col');
+			th.textContent = tr(peerModel.headers[h]);
+			head.appendChild(th);
+		}
+		table.appendChild(document.createElement('tbody'));
+		container.appendChild(table);
+		body.innerHTML = '';
+		body.appendChild(container);
+	}
+	var tbody = table.tBodies[0];
+	while (tbody.rows.length > count) tbody.deleteRow(tbody.rows.length - 1);
+	var fragment = document.createDocumentFragment();
+	for (var n = tbody.rows.length; n < count; n++) {
+		var row = document.createElement('tr');
+		for (var c = 0; c < peerModel.headers.length; c++) {
+			var td = document.createElement('td');
+			var header = peerModel.headers[c].toLowerCase();
+			td.className = header === 'ipv4' ? 'et-peer-address' : (header === 'hostname' ? 'et-peer-name' : 'et-peer-number');
+			row.appendChild(td);
+		}
+		fragment.appendChild(row);
+	}
+	tbody.appendChild(fragment);
+	for (var r = 0; r < count; r++) {
+		var values = peerModel.rows[matches[start + r]];
+		for (var k = 0; k < peerModel.headers.length; k++) {
+			var cell = tbody.rows[r].cells[k];
+			var value = values[k] || '-';
+			if (cell.etValue !== value) {
+				cell.textContent = tr(value);
+				cell.etValue = value;
+			}
+		}
+	}
+	var empty = document.getElementById('et_peer_empty');
+	if (!count && !empty) {
+		empty = document.createElement('div');
+		empty.id = 'et_peer_empty';
+		empty.className = 'et-empty';
+		empty.textContent = '<%:No matching devices%>';
+		body.appendChild(empty);
+	} else if (count && empty) {
+		empty.parentNode.removeChild(empty);
+	}
+	setConnText(document.getElementById('et_peer_count'), '<%:Devices%>: ' + matches.length + (peerQuery ? ' / ' + peerModel.rows.length : ''));
+	setConnText(document.getElementById('et_peer_page_info'), (count ? start + 1 : 0) + '–' + (start + count) + ' / ' + matches.length);
+	document.getElementById('et_peer_pager').style.display = 'flex';
+	document.getElementById('et_peer_prev').disabled = peerPage === 0;
+	document.getElementById('et_peer_next').disabled = peerPage >= pages - 1;
+}
 
-	var keys = connInfoQueue;
-	connInfoQueue = [];
-	connInfoBusy = true;
-	setRefreshBtnBusy(true);
+function renderConnInfo(sec) {
+	if (sec.content === undefined || sec.rendered === sec.content && sec.renderedConfig === sec.configFile) return;
+	if (sec.id === 'peer') {
+		peerModel = parsePeerTable(sec.content);
+		if (peerModel) {
+			renderPeerTable();
+		} else {
+			document.getElementById('et_peer_body').innerHTML = parseTable(sec.content, sec.id);
+			document.getElementById('et_peer_pager').style.display = 'none';
+			setConnText(document.getElementById('et_peer_count'), '');
+		}
+	} else {
+		lastConfigFile = sec.configFile || '';
+		document.getElementById('tab_' + sec.id).innerHTML = parseTable(sec.content, sec.id);
+	}
+	sec.rendered = sec.content;
+	sec.renderedConfig = sec.configFile;
+}
 
+function updateConnInfoState() {
+	var sec = connInfoSection(currentTab);
+	var busy = !!sec.xhr;
+	var button = document.getElementById('et_conninfo_refresh');
+	button.disabled = busy;
+	button.classList.toggle('loading', busy);
+	setConnText(button.querySelector('span'), busy ? '<%:Refreshing...%>' : '<%:Refresh%>');
+	document.getElementById('tab_' + sec.id).setAttribute('aria-busy', busy ? 'true' : 'false');
+	var message = '<%:Collecting data...%>';
+	if (sec.error) {
+		message = sec.content === undefined ? '<%:Loading timed out. Please click Refresh to try again.%>' : '<%:Update failed. Showing the last available data.%>';
+	} else if (sec.updatedAt) {
+		message = (sec.snapshot ? '<%:Cached data%> · ' : '') + '<%:Last updated%>: ' + new Date(sec.updatedAt).toLocaleTimeString();
+	}
+	if (busy && sec.updatedAt) message += ' · <%:Refreshing...%>';
+	document.getElementById('et_conninfo_update').setAttribute('data-state', sec.error ? 'error' : 'ready');
+	setConnText(document.getElementById('et_conninfo_updated'), message);
+}
+
+function switchTab(tabName) {
+	var sec = connInfoSection(tabName);
+	if (!sec) return;
+	var tabs = document.querySelectorAll('.et-connections .et-tab');
+	for (var i = 0; i < tabs.length; i++) {
+		var active = tabs[i].getAttribute('data-tab') === tabName;
+		tabs[i].classList.toggle('active', active);
+		tabs[i].setAttribute('aria-selected', active ? 'true' : 'false');
+		tabs[i].setAttribute('tabindex', active ? '0' : '-1');
+		var panel = document.getElementById(tabs[i].getAttribute('aria-controls'));
+		panel.classList.toggle('active', active);
+		panel.setAttribute('aria-hidden', active ? 'false' : 'true');
+	}
+	currentTab = tabName;
+	connInfoPendingForce = null;
+	connInfoPendingTab = null;
+	renderConnInfo(sec);
+	updateConnInfoState();
+	requestConnInfo(false);
+}
+
+function scheduleConnInfo() {
+	window.clearTimeout(connInfoTimer);
+	connInfoTimer = null;
+	if (connInfoDisposed || document.hidden || !document.getElementById('et_conninfo_auto').checked) return;
+	var sec = connInfoSection(currentTab);
+	if (sec.xhr) return;
+	var due = (sec.attemptedAt || sec.updatedAt || 0) + (sec.interval || 10000);
+	connInfoTimer = window.setTimeout(function() { requestConnInfo(false); }, Math.max(0, due - Date.now()));
+}
+
+// Two bounded slots let the visible tab bypass one slow diagnostic request.
+// No historical queue: after completion only the currently selected tab can start.
+function requestConnInfo(force) {
+	window.clearTimeout(connInfoTimer);
+	connInfoTimer = null;
+	if (connInfoDisposed || document.hidden) return;
+	var sec = connInfoSection(currentTab);
+	if (sec.xhr) return;
+	var now = Date.now();
+	if (!force && now - (sec.attemptedAt || sec.updatedAt || 0) < (sec.interval || 10000)) {
+		scheduleConnInfo();
+		return;
+	}
+	if (connInfoRequests >= 2) {
+		connInfoPendingTab = sec.id;
+		if (force) connInfoPendingForce = sec.id;
+		return;
+	}
+	connInfoPendingForce = null;
+	connInfoPendingTab = null;
 	var xhr = new XMLHttpRequest();
+	sec.xhr = xhr;
+	connInfoRequests++;
+	updateConnInfoState();
 	var finished = false;
-
-	var onDone = function(data) {
+	function done(data) {
 		if (finished) return;
 		finished = true;
-		connInfoBusy = false;
-		setRefreshBtnBusy(false);
-		if (data) {
-			if (typeof data.config_file === 'string') {
-				lastConfigFile = data.config_file;
+		sec.xhr = null;
+		connInfoRequests--;
+		if (connInfoDisposed) return;
+		sec.attemptedAt = Date.now();
+		if (data && typeof data[sec.key] === 'string') {
+			sec.content = data[sec.key];
+			sec.configFile = typeof data.config_file === 'string' ? data.config_file : '';
+			sec.updatedAt = sec.attemptedAt;
+			sec.snapshot = false;
+			sec.error = false;
+			if (sec.id === 'peer') {
+				try { window.sessionStorage.setItem(connSnapshotKey, JSON.stringify({time: sec.updatedAt, content: sec.content})); } catch (e) { /* Storage is optional. */ }
 			}
-			for (var i = 0; i < keys.length; i++) {
-				connInfoLoaded[keys[i]] = true;
-			}
-			updateConnInfo(data);
 		} else {
-			reportConnInfoError(keys);
+			sec.error = true;
+			if (sec.content === undefined) {
+				var target = document.getElementById(sec.id === 'peer' ? 'et_peer_body' : 'tab_' + sec.id);
+				target.innerHTML = '<div class="et-error"><%:Loading timed out. Please click Refresh to try again.%></div>';
+			}
 		}
-		// 继续处理下一个分区
-		pumpConnInfoQueue();
-	};
-
-	xhr.open('GET', '<%=url("admin", "vpn", "easytier", "api_conninfo")%>?parts=' + encodeURIComponent(keys.join(',')), true);
-	xhr.timeout = 20000;
-	xhr.onreadystatechange = function() {
-		if (xhr.readyState !== 4) return;
+		if (!document.hidden) {
+			renderConnInfo(connInfoSection(currentTab));
+			updateConnInfoState();
+		}
+		// Only finish the latest explicit tab selection, never an abandoned queue.
+		if (connInfoPendingTab === currentTab || connInfoPendingForce === currentTab) requestConnInfo(connInfoPendingForce === currentTab);
+		else scheduleConnInfo();
+	}
+	xhr.open('GET', connInfoUrl + '?parts=' + encodeURIComponent(sec.key) + (force ? '&refresh=1' : ''), true);
+	xhr.timeout = 12000;
+	xhr.onload = function() {
 		var data = null;
 		if (xhr.status === 200) {
-			try {
-				data = JSON.parse(xhr.responseText);
-			} catch (e) {
-				data = null;
-			}
+			try { data = JSON.parse(xhr.responseText); } catch (e) { /* Report an invalid response below. */ }
 		}
-		onDone(data);
+		done(data);
 	};
-	xhr.ontimeout = function() { onDone(null); };
-	xhr.onerror = function() { onDone(null); };
-	xhr.onabort = function() { onDone(null); };
+	xhr.onerror = xhr.ontimeout = xhr.onabort = function() { done(null); };
 	xhr.send();
 }
 
-function setRefreshBtnBusy(busy) {
-	var btn = document.getElementById('et_conninfo_refresh');
-	if (!btn) return;
-	var btnText = btn.querySelector('span');
-	btn.disabled = busy;
-	if (busy) {
-		btn.classList.add('loading');
-		if (btnText) btnText.textContent = '<%:Refreshing...%>';
-	} else {
-		btn.classList.remove('loading');
-		if (btnText) btnText.textContent = '<%:Refresh%>';
-	}
-}
-
 function refreshConnInfo() {
-	// 手动刷新：立即刷新当前显示的分区，其余分区标记失效，切过去时再重新加载，
-	// 这样点一次刷新不会同时起十几个 easytier-cli 进程
-	var activeKey = connInfoKeyOfTab(currentTab);
-	for (var i = 0; i < connInfoSections.length; i++) {
-		if (connInfoSections[i].key !== activeKey) {
-			delete connInfoLoaded[connInfoSections[i].key];
-		}
-	}
-	queueConnInfo([currentTab], true);
+	requestConnInfo(true);
 }
 
-function updateConnInfo(data) {
-	if (!data) return;
-
-	connInfoSections.forEach(function(sec) {
-		var el = document.getElementById('tab_' + sec.id);
-		if (el && data[sec.key] !== undefined) {
-			el.innerHTML = parseTable(data[sec.key], sec.id);
-			el.setAttribute('data-loaded', '1');
-		}
-	});
-}
-
-// 初始化TAB切换事件
 document.addEventListener('DOMContentLoaded', function() {
-	var tabs = document.querySelectorAll('.et-tab');
-	tabs.forEach(function(tab) {
-		tab.addEventListener('click', function(e) {
-			e.preventDefault();
-			e.stopPropagation();
-			var tabName = this.getAttribute('data-tab');
-			if (tabName) {
-				switchTab(tabName);
-			}
-			return false;
+	var tabs = document.querySelectorAll('.et-connections .et-tab');
+	for (var i = 0; i < tabs.length; i++) {
+		tabs[i].addEventListener('click', function() { switchTab(this.getAttribute('data-tab')); });
+		tabs[i].addEventListener('keydown', function(event) {
+			var key = event.keyCode;
+			if (key !== 37 && key !== 39 && key !== 36 && key !== 35) return;
+			event.preventDefault();
+			var index = 0;
+			for (var j = 0; j < tabs.length; j++) { if (tabs[j] === this) index = j; }
+			index = key === 36 ? 0 : (key === 35 ? tabs.length - 1 : (index + (key === 39 ? 1 : -1) + tabs.length) % tabs.length);
+			tabs[index].focus();
+			switchTab(tabs[index].getAttribute('data-tab'));
 		});
+	}
+	document.getElementById('et_peer_search').addEventListener('input', function() {
+		window.clearTimeout(peerSearchTimer);
+		peerSearchTimer = window.setTimeout(function() {
+			peerQuery = document.getElementById('et_peer_search').value.trim().toLowerCase();
+			peerPage = 0;
+			renderPeerTable();
+		}, 120);
 	});
-	
-	// 加载贡献者
-	loadContributors();
-
-	// 初始只加载当前显示的分区，其余分区等切过去时再按需请求
-	queueConnInfo([currentTab], false);
-
-	// 定时刷新：只刷新当前显示的分区，不再每次把十几个 easytier-cli 全部跑一遍。
-	// 间隔取 10 秒，低性能设备上也能跑得过来（单次只起一个进程）
-	window.setInterval(function() {
-		if (document.hidden) return;
-		queueConnInfo([currentTab], true);
-	}, 10000);
+	document.getElementById('et_peer_prev').onclick = function() { peerPage--; renderPeerTable(); };
+	document.getElementById('et_peer_next').onclick = function() { peerPage++; renderPeerTable(); };
+	document.getElementById('et_conninfo_auto').onchange = function() {
+		if (this.checked) requestConnInfo(false);
+		else window.clearTimeout(connInfoTimer);
+	};
+	try {
+		var snapshot = JSON.parse(window.sessionStorage.getItem(connSnapshotKey) || 'null');
+		var age = snapshot ? Date.now() - snapshot.time : -1;
+		if (snapshot && typeof snapshot.content === 'string' && age >= 0 && age < 60000) {
+			var sec = connInfoSection('peer');
+			sec.content = snapshot.content;
+			sec.updatedAt = snapshot.time;
+			sec.snapshot = true;
+			renderConnInfo(sec);
+		}
+	} catch (e) { /* Private browsing and storage limits must not block loading. */ }
+	updateConnInfoState();
+	requestConnInfo(false);
 });
 
-// 贡献者轮播管理 (ES5)
-var contributorsCarousel = {
-	allContributors: [],
-	currentPage: 0,
-	pageSize: 30,
-	totalPages: 0,
-	autoPlayTimer: null,
-	autoPlayInterval: 3000,
-	container: null,
-	section: null,
-	pageInfo: null,
-	dotsContainer: null,
-	
-	init: function() {
-		this.container = document.getElementById('contributors');
-		this.section = document.getElementById('contributors-section');
-		this.pageInfo = document.getElementById('contributors-page-info');
-		this.dotsContainer = document.getElementById('contributors-dots');
-		this.setupHoverPause();
-		this.loadData();
-	},
-	
-	setupHoverPause: function() {
-		var self = this;
-		if (!this.section) return;
-		
-		this.section.addEventListener('mouseenter', function() {
-			self.stopAutoPlay();
-		});
-		
-		this.section.addEventListener('mouseleave', function() {
-			self.startAutoPlay();
-		});
-		
-		// 移动端滑动支持
-		this.setupTouchSwipe();
-	},
-	
-	setupTouchSwipe: function() {
-		var self = this;
-		if (!this.container) return;
-		
-		var startX = 0;
-		var startY = 0;
-		var threshold = 50; // 滑动阈值
-		
-		this.container.addEventListener('touchstart', function(e) {
-			self.stopAutoPlay();
-			startX = e.touches[0].clientX;
-			startY = e.touches[0].clientY;
-		});
-		
-		this.container.addEventListener('touchend', function(e) {
-			var endX = e.changedTouches[0].clientX;
-			var endY = e.changedTouches[0].clientY;
-			var deltaX = endX - startX;
-			var deltaY = endY - startY;
-			
-			// 确保是水平滑动
-			if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
-				if (deltaX > 0) {
-					// 右滑 - 上一页
-					var prevPage = (self.currentPage - 1 + self.totalPages) % self.totalPages;
-					self.showPage(prevPage);
-				} else {
-					// 左滑 - 下一页
-					self.nextPage();
-				}
-			}
-			
-			self.startAutoPlay();
-		});
-	},
-	
-	loadData: function() {
-		var self = this;
-		var xhr = new XMLHttpRequest();
-		xhr.open('GET', 'https://api.github.com/repos/EasyTier/EasyTier/contributors?per_page=100', true);
-		xhr.timeout = 10000;
-		
-		xhr.onload = function() {
-			if (xhr.status === 200) {
-				try {
-					var data = JSON.parse(xhr.responseText);
-					if (!data || data.length === 0) return;
-					
-					self.allContributors = data;
-					self.totalPages = Math.ceil(data.length / self.pageSize);
-					self.renderDots();
-					self.showPage(0);
-					self.section.style.display = 'block';
-					self.startAutoPlay();
-				} catch (e) {
-					console.error('Failed to parse contributors:', e);
-				}
-			}
-		};
-		
-		xhr.onerror = function() {
-			console.error('Failed to load contributors');
-		};
-		
-		xhr.ontimeout = function() {
-			console.error('Contributors request timeout');
-		};
-		
-		xhr.send();
-	},
-	
-	renderDots: function() {
-		if (!this.dotsContainer) return;
-		this.dotsContainer.innerHTML = '';
-		
-		for (var i = 0; i < this.totalPages; i++) {
-			var dot = document.createElement('div');
-			dot.className = 'et-contributors-dot';
-			dot.setAttribute('data-page', i);
-			
-			var self = this;
-			(function(page) {
-				dot.onclick = function() {
-					self.stopAutoPlay();
-					self.showPage(page);
-					self.startAutoPlay();
-				};
-			})(i);
-			
-			this.dotsContainer.appendChild(dot);
-		}
-	},
-	
-	showPage: function(pageIndex) {
-		var self = this;
-		if (pageIndex < 0 || pageIndex >= this.totalPages) return;
-		
-		// 退出动画
-		this.container.classList.remove('active');
-		this.container.classList.add('exit');
-		
-		setTimeout(function() {
-			self.currentPage = pageIndex;
-			var start = pageIndex * self.pageSize;
-			var end = Math.min(start + self.pageSize, self.allContributors.length);
-			var pageData = self.allContributors.slice(start, end);
-			
-			// 更新内容
-			self.container.innerHTML = '';
-			for (var i = 0; i < pageData.length; i++) {
-				var user = pageData[i];
-				var a = document.createElement('a');
-				a.href = user.html_url;
-				a.target = '_blank';
-				a.rel = 'noopener noreferrer';
-				
-				var img = document.createElement('img');
-				img.src = user.avatar_url;
-				img.alt = user.login;
-				img.title = user.login + ' (' + user.contributions + ' contributions)';
-				
-				a.appendChild(img);
-				self.container.appendChild(a);
-			}
-			
-			// 更新分页信息
-			if (self.pageInfo) {
-				self.pageInfo.textContent = (pageIndex + 1) + ' / ' + self.totalPages;
-			}
-			
-			// 更新指示器
-			var dots = self.dotsContainer.querySelectorAll('.et-contributors-dot');
-			for (var j = 0; j < dots.length; j++) {
-				dots[j].classList.remove('active');
-			}
-			if (dots[pageIndex]) {
-				dots[pageIndex].classList.add('active');
-			}
-			
-			// 进入动画
-			self.container.classList.remove('exit');
-			setTimeout(function() {
-				self.container.classList.add('active');
-			}, 50);
-		}, 600);
-	},
-	
-	nextPage: function() {
-		var next = (this.currentPage + 1) % this.totalPages;
-		this.showPage(next);
-	},
-	
-	startAutoPlay: function() {
-		var self = this;
-		this.stopAutoPlay();
-		this.autoPlayTimer = setInterval(function() {
-			self.nextPage();
-		}, this.autoPlayInterval);
-	},
-	
-	stopAutoPlay: function() {
-		if (this.autoPlayTimer) {
-			clearInterval(this.autoPlayTimer);
-			this.autoPlayTimer = null;
-		}
+document.addEventListener('visibilitychange', function() {
+	if (document.hidden) window.clearTimeout(connInfoTimer);
+	else {
+		renderConnInfo(connInfoSection(currentTab));
+		updateConnInfoState();
+		if (document.getElementById('et_conninfo_auto').checked || connInfoPendingTab === currentTab) requestConnInfo(connInfoPendingForce === currentTab);
 	}
-};
-
-// 加载贡献者
-function loadContributors() {
-	contributorsCarousel.init();
-}
-
-// 自动刷新已改为只刷新当前显示的分区，见上方 DOMContentLoaded 中的定时器
+});
+window.addEventListener('pagehide', function() {
+	connInfoDisposed = true;
+	window.clearTimeout(connInfoTimer);
+	window.clearTimeout(peerSearchTimer);
+	for (var i = 0; i < connInfoSections.length; i++) {
+		if (connInfoSections[i].xhr) connInfoSections[i].xhr.abort();
+	}
+});
+window.addEventListener('pageshow', function(event) {
+	if (!event.persisted) return;
+	connInfoDisposed = false;
+	if (document.getElementById('et_conninfo_auto').checked || connInfoPendingTab === currentTab) requestConnInfo(connInfoPendingForce === currentTab);
+});
 //]]>
 </script>

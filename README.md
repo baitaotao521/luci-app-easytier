@@ -8,11 +8,9 @@
 
 OpenWrt LuCI界面，用于管理 [EasyTier](https://github.com/EasyTier/EasyTier) - 一个简单、安全、去中心化的内网穿透VPN组网方案。
 
-## UI 预览
+## 状态页
 
-<img width="1584" height="2523" alt="image" src="https://github.com/user-attachments/assets/afa1d31b-cb97-4502-a5ac-2ada8c09f78d" />
-
-<img width="1386" height="1758" alt="image" src="https://github.com/user-attachments/assets/c65bf3fe-5c8b-42c3-8093-96c076350846" />
+紧凑的服务概览与设备列表，支持设备搜索、分页、亮色/暗色主题及移动端布局。虚拟网卡与流量详情按需展开，避免查看设备时额外采集流量。
 
 ## ✨ 特性
 
@@ -124,6 +122,13 @@ opkg install kmod-tun
 - **自建控制台** - 配置easytier-web控制台
 - **日志** - 查看运行日志，支持级别过滤
 - **上传程序** - 上传和管理EasyTier二进制文件
+
+### 设备列表与刷新
+
+- 进入状态页默认显示设备列表；再次进入时优先显示当前浏览器会话中 60 秒内的缓存快照，并按需更新。
+- 自动刷新只更新当前分区，普通分区间隔 10 秒，STUN 间隔 60 秒；可取消“自动刷新”或手动刷新。页面隐藏时暂停轮询。
+- 搜索与分页在浏览器本地执行，每页最多显示 50 台设备。后台刷新保留当前搜索、页码和滚动位置；失败时保留上次数据并提示。
+- 运行状态每 5 秒采集一次；版本检查独立进行，不阻塞设备列表。点击版本信息可清理缓存并重新检查。
 
 ## 🛠️ 开发指南
 

@@ -80,75 +80,161 @@ function index()
 	entry({"admin", "vpn", "easytier", "cancel_download"}, call("cancel_download")).leaf = true
 end
 
-function act_status()
-	local e = {}
-	local sys  = require "luci.sys"
-	local uci  = require "luci.model.uci".cursor()
-	local port = tonumber(uci:get_first("easytier", "easytier", "web_html_port"))
-	e.crunning = luci.sys.call("pgrep easytier-core >/dev/null") == 0
-	e.wrunning = luci.sys.call("pgrep easytier-web >/dev/null") == 0
-	e.port = (port or 0)
-	e.cenabled = uci:get_first("easytier", "easytier", "enabled") == "1"
-	e.wenabled = uci:get_first("easytier", "easytier", "web_enabled") == "1"
-	
-	-- 使用 Lua 原生计算运行时长
-	e.etsta = calc_uptime("/tmp/easytier_time")
-	e.etwebsta = calc_uptime("/tmp/easytierweb_time")
-	
-	-- 获取 CPU 和内存使用率（使用原始命令）
-	local command2 = io.popen('test ! -z "`pidof easytier-core`" && (top -b -n1 | grep -E "$(pidof easytier-core)" 2>/dev/null | grep -v grep | awk \'{for (i=1;i<=NF;i++) {if ($i ~ /easytier-core/) break; else cpu=i}} END {print $cpu}\')')
-	e.etcpu = command2:read("*all")
-	command2:close()
-	
-	local command3 = io.popen("test ! -z `pidof easytier-core` && (cat /proc/$(pidof easytier-core | awk '{print $NF}')/status | grep -w VmRSS | awk '{printf \"%.2f MB\", $2/1024}')")
-	e.etram = command3:read("*all")
-	command3:close()
-	
-	local command4 = io.popen('test ! -z "`pidof easytier-web`" && (top -b -n1 | grep -E "$(pidof easytier-web)" 2>/dev/null | grep -v grep | awk \'{for (i=1;i<=NF;i++) {if ($i ~ /easytier-web/) break; else cpu=i}} END {print $cpu}\')')
-	e.etwebcpu = command4:read("*all")
-	command4:close()
-	
-	local command5 = io.popen("test ! -z `pidof easytier-web` && (cat /proc/$(pidof easytier-web | awk '{print $NF}')/status | grep -w VmRSS | awk '{printf \"%.2f MB\", $2/1024}')")
-	e.etwebram = command5:read("*all")
-	command5:close()
-	
-	-- 获取版本信息
-	local cached_newtag = safe_read_file("/tmp/easytiernew.tag")
-	if cached_newtag and cached_newtag ~= "" then
-		e.etnewtag = cached_newtag:gsub("[\r\n]+", "")
-	else
-		e.etnewtag = safe_exec("curl -L -k -s --connect-timeout 3 --user-agent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36' https://api.github.com/repos/EasyTier/EasyTier/releases/latest | grep tag_name | sed 's/[^0-9.]*//g'")
-		if e.etnewtag ~= "" then
-			local f = io.open("/tmp/easytiernew.tag", "w")
-			if f then f:write(e.etnewtag); f:close() end
+-- Keep CPU samples on disk: LuCI CGI requests may not share a Lua state.
+local STATUS_CPU_SAMPLE = "/tmp/easytier-status.cpu"
+
+local function status_processes(corebin, webbin)
+	local fs = require "nixio.fs"
+	local services = {
+		core = { identities = {}, ticks = 0, rss = 0, count = 0 },
+		web = { identities = {}, ticks = 0, rss = 0, count = 0 }
+	}
+	local corename = corebin:match("([^/]+)$") or "easytier-core"
+	local webname = webbin:match("([^/]+)$") or "easytier-web"
+	local entries = fs.dir("/proc")
+	if entries then
+		for pid in entries do
+			if pid:match("^%d+$") then
+				local stat = safe_read_file("/proc/" .. pid .. "/stat")
+				local name, fields
+				if stat then name, fields = stat:match("^%d+ %((.*)%)%s+(.+)") end
+				local service
+				if name == "easytier-core" or name == corename:sub(1, 15) then
+					service = services.core
+				elseif name and (name:match("^easytier%-web") or name == webname:sub(1, 15)) then
+					-- Linux comm is truncated to 15 bytes, including easytier-web-embed.
+					service = services.web
+				end
+				if service and fields then
+					local index, utime, stime, started = 0
+					for value in fields:gmatch("%S+") do
+						index = index + 1
+						if index == 12 then utime = tonumber(value)
+						elseif index == 13 then stime = tonumber(value)
+						elseif index == 20 then started = value; break end
+					end
+					if utime and stime and started and started:match("^%d+$") then
+						service.count = service.count + 1
+						service.identities[#service.identities + 1] = pid .. ":" .. started
+						service.ticks = service.ticks + utime + stime
+						local status = safe_read_file("/proc/" .. pid .. "/status") or ""
+						service.rss = service.rss + (tonumber(status:match("VmRSS:%s*(%d+)")) or 0)
+					end
+				end
+			end
 		end
 	end
-	
-	local cached_tag = safe_read_file("/tmp/easytier.tag")
-	if cached_tag and cached_tag ~= "" then
-		e.ettag = cached_tag:gsub("[\r\n]+", "")
-	else
-		local easytierbin = uci:get_first("easytier", "easytier", "easytierbin") or "/usr/bin/easytier-core"
-		e.ettag = safe_exec(easytierbin .. " -V 2>/dev/null | sed 's/^[^0-9]*//'")
-		if e.ettag == "" or e.ettag == nil then e.ettag = "unknown" end
-		local f = io.open("/tmp/easytier.tag", "w")
-		if f then f:write(e.ettag); f:close() end
+	for _, service in pairs(services) do
+		table.sort(service.identities)
+		service.identity = table.concat(service.identities, ",")
+		if service.identity == "" then service.identity = "-" end
 	end
-	
-	local cached_webtag = safe_read_file("/tmp/easytierweb.tag")
-	if cached_webtag and cached_webtag ~= "" then
-		e.etwebtag = cached_webtag:gsub("[\r\n]+", "")
-	else
-		local easytierwebbin = uci:get_first("easytier", "easytier", "webbin") or "/usr/bin/easytier-web"
-		e.etwebtag = safe_exec(easytierwebbin .. " -V 2>/dev/null | sed 's/^[^0-9]*//'")
-		if e.etwebtag == "" or e.etwebtag == nil then e.etwebtag = "unknown" end
-		local f = io.open("/tmp/easytierweb.tag", "w")
-		if f then f:write(e.etwebtag); f:close() end
+	return services
+end
+
+local function status_cpu(services)
+	local stat = safe_read_file("/proc/stat") or ""
+	local cpu = stat:match("^cpu%s+([^\n]+)")
+	local total, count = 0, 0
+	if cpu then
+		for value in cpu:gmatch("%d+") do
+			count = count + 1
+			-- guest/guest_nice are already included in user/nice.
+			if count > 8 then break end
+			total = total + tonumber(value)
+		end
 	end
-	
+	local uptime = tonumber((safe_read_file("/proc/uptime") or ""):match("^([%d%.]+)"))
+	local previous = safe_read_file(STATUS_CPU_SAMPLE) or ""
+	local oldtime, oldtotal = previous:match("^v1 ([%d%.]+) (%d+)\n")
+	oldtime, oldtotal = tonumber(oldtime), tonumber(oldtotal)
+	local valid = count >= 4 and uptime and total > 0
+	local elapsed = valid and oldtime and oldtotal and uptime > oldtime and total > oldtotal
+	for name, service in pairs(services) do
+		service.cpu = ""
+		local identity, ticks = previous:match("\n" .. name .. " ([%d:,%-]+) (%d+)\n")
+		ticks = tonumber(ticks)
+		if elapsed and service.count > 0 and identity == service.identity and ticks and service.ticks >= ticks then
+			local percent = (service.ticks - ticks) * 100 / (total - oldtotal)
+			service.cpu = string.format("%.1f%%", math.min(percent, 100))
+		end
+	end
+	if valid then
+		local content = string.format("v1 %.2f %.0f\ncore %s %.0f\nweb %s %.0f\n",
+			uptime, total, services.core.identity, services.core.ticks, services.web.identity, services.web.ticks)
+		local temporary = os.tmpname()
+		if temporary then
+			local file = io.open(temporary, "w")
+			if file then
+				local written = file:write(content)
+				file:close()
+				if written then os.rename(temporary, STATUS_CPU_SAMPLE) end
+			end
+			os.remove(temporary)
+		end
+	else
+		os.remove(STATUS_CPU_SAMPLE)
+	end
+end
+
+local function status_cached_version(path)
+	return (safe_read_file(path) or ""):gsub("[\r\n]+", "")
+end
+
+local function status_save_version(path, version)
+	if version ~= "" and version ~= "unknown" then
+		local file = io.open(path, "w")
+		if file then file:write(version); file:close() end
+	end
+end
+
+local function status_binary_version(path, cached, refresh)
+	if refresh and (cached == "" or cached == "unknown") then
+		local quoted = "'" .. path:gsub("'", "'\\''") .. "'"
+		local output = safe_exec(quoted .. " -V 2>/dev/null")
+		cached = output:match("%d[^\r\n]*") or ""
+	end
+	return cached ~= "" and cached or "unknown"
+end
+
+function act_status()
+	local e = {}
+	local uci = require "luci.model.uci".cursor()
+	local corebin = uci:get_first("easytier", "easytier", "easytierbin") or "/usr/bin/easytier-core"
+	local webbin = uci:get_first("easytier", "easytier", "webbin") or "/usr/bin/easytier-web"
+	local services = status_processes(corebin, webbin)
+	status_cpu(services)
+	e.crunning = services.core.count > 0
+	e.wrunning = services.web.count > 0
+	e.port = tonumber(uci:get_first("easytier", "easytier", "web_html_port")) or 0
+	e.cenabled = uci:get_first("easytier", "easytier", "enabled") == "1"
+	e.wenabled = uci:get_first("easytier", "easytier", "web_enabled") == "1"
+	e.etsta = calc_uptime("/tmp/easytier_time")
+	e.etwebsta = calc_uptime("/tmp/easytierweb_time")
+	e.etcpu = services.core.cpu
+	e.etwebcpu = services.web.cpu
+	e.etram = e.crunning and string.format("%.2f MB", services.core.rss / 1024) or ""
+	e.etwebram = e.wrunning and string.format("%.2f MB", services.web.rss / 1024) or ""
+
+	-- Routine polling never executes binaries or reaches the network.
+	local refresh = luci.http.formvalue("versions") == "1"
+	e.etnewtag = status_cached_version("/tmp/easytiernew.tag")
+	if refresh and e.etnewtag == "" then
+		local release = safe_exec("curl -f -L -k -s --connect-timeout 3 --max-time 4 --user-agent 'luci-app-easytier' 'https://api.github.com/repos/EasyTier/EasyTier/releases/latest' 2>/dev/null")
+		local tag = release:match('"tag_name"%s*:%s*"([^"]+)"') or ""
+		e.etnewtag = tag:match("^[vV]?(%d[^%s]*)$") or ""
+		status_save_version("/tmp/easytiernew.tag", e.etnewtag)
+	end
+	local coretag = status_cached_version("/tmp/easytier.tag")
+	local webtag = status_cached_version("/tmp/easytierweb.tag")
+	e.ettag = status_binary_version(corebin, coretag, refresh)
+	e.etwebtag = status_binary_version(webbin, webtag, refresh)
+	if refresh then
+		if coretag == "" or coretag == "unknown" then status_save_version("/tmp/easytier.tag", e.ettag) end
+		if webtag == "" or webtag == "unknown" then status_save_version("/tmp/easytierweb.tag", e.etwebtag) end
+	end
 	e.no_tun = uci:get_first("easytier", "easytier", "no_tun") == "1"
 	e.dev_name = uci:get_first("easytier", "easytier", "tunname") or "tun0"
-
 	luci.http.prepare_content("application/json")
 	luci.http.write_json(e)
 end
@@ -293,64 +379,37 @@ end
 
 function get_tun_info()
 	luci.http.prepare_content("application/json")
-	
+	local nixio = require "nixio"
+	local fs = require "nixio.fs"
 	local ifname = luci.http.formvalue("ifname") or "tun0"
-	
-	local exists = luci.sys.exec("ip link show " .. ifname .. " >/dev/null 2>&1 && echo 1 || echo 0")
-	if not exists:match("1") then
-		luci.http.write('{"success":false,"exists":false}')
+	if ifname == "" or ifname:find("/", 1, true) or not fs.access("/sys/class/net/" .. ifname) then
+		luci.http.write_json({success = true, exists = false})
 		return
 	end
-	
-	local ifconfig_out = luci.sys.exec("ifconfig " .. ifname .. " 2>/dev/null")
-	
-	local ip = ifconfig_out:match("inet addr:([%d%.]+)") or ifconfig_out:match("inet ([%d%.]+)")
-	
-	local netmask = ""
-	local netmask_full = ifconfig_out:match("Mask:([%d%.]+)") or ifconfig_out:match("netmask ([%d%.]+)")
-	
-	if not netmask_full or netmask_full == "" then
-		local ip_output = luci.sys.exec("ip -4 addr show " .. ifname .. " 2>/dev/null | grep 'inet ' | head -n1 | awk '{print $2}'")
-		local cidr = ip_output:match("/(%d+)")
-		if cidr then
-			cidr = tonumber(cidr)
-			local mask = 0xFFFFFFFF - (2 ^ (32 - cidr) - 1)
-			netmask = string.format("%d.%d.%d.%d",
-				math.floor(mask / 16777216) % 256,
-				math.floor(mask / 65536) % 256,
-				math.floor(mask / 256) % 256,
-				mask % 256)
+	local base = "/sys/class/net/" .. ifname .. "/"
+	local response = {
+		success = true,
+		exists = true,
+		ip = "",
+		netmask = "",
+		mtu = (safe_read_file(base .. "mtu") or ""):match("%d+") or "",
+		state = "UNKNOWN",
+		rx_bytes = tonumber(safe_read_file(base .. "statistics/rx_bytes")) or 0,
+		tx_bytes = tonumber(safe_read_file(base .. "statistics/tx_bytes")) or 0
+	}
+	local flags = tonumber((safe_read_file(base .. "flags") or ""):match("[%da-fA-Fx]+"))
+	if flags then response.state = flags % 2 == 1 and "UP" or "DOWN" end
+	for _, address in ipairs(nixio.getifaddrs() or {}) do
+		if address.name == ifname then
+			if address.family == "inet" and response.ip == "" then
+				response.ip = address.addr or ""
+				response.netmask = address.netmask or ""
+			elseif address.family == "inet6" and not response.ipv6 and address.addr then
+				response.ipv6 = address.addr .. (address.prefix and "/" .. address.prefix or "")
+			end
 		end
-	else
-		netmask = netmask_full
 	end
-	
-	local ipv6_cmd = luci.sys.exec("ip -6 addr show " .. ifname .. " 2>/dev/null | grep 'inet6' | head -n1 | awk '{print $2}'")
-	local ipv6 = ipv6_cmd:gsub("%s", "")
-	if ipv6 == "" then ipv6 = nil end
-	
-	local mtu = ifconfig_out:match("MTU:(%d+)") or luci.sys.exec("ip link show " .. ifname .. " 2>/dev/null | head -n1 | sed -n 's/.*mtu \\([0-9]*\\).*/\\1/p'"):gsub("%s", "")
-	
-	local state = "UNKNOWN"
-	if ifconfig_out:match("UP") then
-		state = "UP"
-	elseif ifconfig_out:match("DOWN") then
-		state = "DOWN"
-	end
-	
-	local rx = luci.sys.exec("cat /sys/class/net/" .. ifname .. "/statistics/rx_bytes 2>/dev/null || echo 0"):gsub("%s", "")
-	local tx = luci.sys.exec("cat /sys/class/net/" .. ifname .. "/statistics/tx_bytes 2>/dev/null || echo 0"):gsub("%s", "")
-	
-	local response = string.format('{"success":true,"exists":true,"ip":"%s","netmask":"%s","mtu":"%s","state":"%s","rx_bytes":%s,"tx_bytes":%s',
-		ip or "", netmask, mtu, state, rx, tx)
-	
-	if ipv6 then
-		response = response .. ',"ipv6":"' .. ipv6 .. '"'
-	end
-	
-	response = response .. '}'
-	
-	luci.http.write(response)
+	luci.http.write_json(response)
 end
 
 function get_log()
@@ -595,9 +654,7 @@ function clear_version_cache()
 	luci.http.write("OK")
 end
 
--- 连接信息各分区与 easytier-cli 子命令的对应关系。
--- 实测每调用一次 easytier-cli 都要新起一个进程，单次进程启动开销约 200ms（路由器上更慢），
--- RPC 往返本身只要几毫秒，因此耗时几乎完全取决于进程个数，改为按分区按需加载。
+-- Load only the visible diagnostic; each CLI invocation starts a new process.
 local CONNINFO_CLI_PARTS = {
 	node = "node",
 	peer = "peer",
@@ -618,87 +675,84 @@ local CONNINFO_LOCAL_PARTS = { cmdline = true }
 local CONNINFO_CACHE_DIR = "/tmp/easytier_conninfo"
 local CONNINFO_CACHE_TTL = 3
 
-local function read_conninfo_cache(name)
-	local handle = io.open(CONNINFO_CACHE_DIR .. "/" .. name, "r")
-	if not handle then
-		return nil
+local function conninfo_process(binary)
+	local fs = require "nixio.fs"
+	local entries = fs.dir("/proc")
+	local name = (binary:match("([^/]+)$") or "easytier-core"):sub(1, 15)
+	if entries then
+		for pid in entries do
+			if pid:match("^%d+$") then
+				local stat = safe_read_file("/proc/" .. pid .. "/stat") or ""
+				local comm, fields = stat:match("^%d+ %((.*)%)%s+(.+)")
+				if comm == name or comm == "easytier-core" then
+					local index = 0
+					for value in fields:gmatch("%S+") do
+						index = index + 1
+						if index == 20 then return pid, pid .. ":" .. value end
+					end
+				end
+			end
+		end
 	end
-	local content = handle:read("*all") or ""
-	handle:close()
-	local ts, data = content:match("^(%d+)\n([%s%S]*)$")
-	if not ts or (os.time() - tonumber(ts)) > CONNINFO_CACHE_TTL then
-		return nil
-	end
+end
+
+local function read_conninfo_cache(name, instance)
+	local content = safe_read_file(CONNINFO_CACHE_DIR .. "/" .. name) or ""
+	local ts, cached_instance, data = content:match("^(%d+)\n([^\n]+)\n([%s%S]*)$")
+	local age = ts and os.time() - tonumber(ts)
+	local ttl = name == "stun" and 60 or CONNINFO_CACHE_TTL
+	if not age or age < 0 or age > ttl or cached_instance ~= instance then return nil end
 	return data
 end
 
-local function write_conninfo_cache(name, data)
-	luci.sys.call("mkdir -p " .. CONNINFO_CACHE_DIR)
-	local handle = io.open(CONNINFO_CACHE_DIR .. "/" .. name, "w")
+local function write_conninfo_cache(name, instance, data)
+	local fs = require "nixio.fs"
+	fs.mkdir(CONNINFO_CACHE_DIR)
+	local temporary = os.tmpname()
+	if not temporary then return end
+	local handle = io.open(temporary, "w")
 	if handle then
-		handle:write(tostring(os.time()) .. "\n" .. data)
+		local written = handle:write(tostring(os.time()) .. "\n" .. instance .. "\n" .. data)
 		handle:close()
+		if written then os.rename(temporary, CONNINFO_CACHE_DIR .. "/" .. name) end
 	end
+	os.remove(temporary)
 end
 
 function act_conninfo()
 	local e = {}
 	local uci = require "luci.model.uci".cursor()
 	local easytierbin = uci:get_first("easytier", "easytier", "easytierbin") or "/usr/bin/easytier-core"
-	local clibin = easytierbin:gsub("easytier%-core$", "easytier-cli")
-
-	-- 解析要加载的分区，前端只请求当前显示的分区；
-	-- 不传 parts 时加载除 stun 以外的所有分区（stun 会实时访问 STUN 服务器，单次实测约 3 秒）
-	local parts = luci.http.formvalue("parts")
+	local clibin = (easytierbin:match("(.*/)") or "/usr/bin/") .. "easytier-cli"
+	local quoted_cli = "'" .. clibin:gsub("'", "'\\''") .. "'"
+	local parts = luci.http.formvalue("parts") or "peer"
+	local refresh = luci.http.formvalue("refresh") == "1"
 	local want_cli, want_local = {}, {}
-	if parts and parts ~= "" then
-		for name in parts:gmatch("[%w_]+") do
-			if CONNINFO_CLI_PARTS[name] then
-				want_cli[name] = true
-			elseif CONNINFO_LOCAL_PARTS[name] then
-				want_local[name] = true
-			end
-		end
-	else
-		for name in pairs(CONNINFO_CLI_PARTS) do
-			if name ~= "stun" then
-				want_cli[name] = true
-			end
-		end
-		for name in pairs(CONNINFO_LOCAL_PARTS) do
-			want_local[name] = true
-		end
+	for name in parts:gmatch("[%w_]+") do
+		if CONNINFO_CLI_PARTS[name] then want_cli[name] = true
+		elseif CONNINFO_LOCAL_PARTS[name] then want_local[name] = true end
 	end
 
-	local process_status = luci.sys.exec("pgrep easytier-core")
-
-	if process_status ~= "" then
-		-- 只运行被请求的分区，命中缓存的分区直接复用结果
+	local pid, instance = conninfo_process(easytierbin)
+	if pid then
 		for name in pairs(want_cli) do
-			local cached = read_conninfo_cache(name)
+			local cached = not refresh and read_conninfo_cache(name, instance)
 			if cached then
 				e[name] = cached
 			else
-				local handle = io.popen(clibin .. " " .. CONNINFO_CLI_PARTS[name] .. " 2>&1")
+				local handle = io.popen(quoted_cli .. " " .. CONNINFO_CLI_PARTS[name] .. " 2>&1")
 				local result = ""
 				if handle then
 					result = handle:read("*all") or ""
 					handle:close()
 				end
 				e[name] = result
-				write_conninfo_cache(name, result)
+				write_conninfo_cache(name, instance, result)
 			end
 		end
 
 		if want_local.cmdline then
-			-- 获取启动参数
-			local cmdhandle = io.popen("cat /proc/$(pidof easytier-core)/cmdline 2>/dev/null | tr '\\0' ' '")
-			if cmdhandle then
-				e.cmdline = cmdhandle:read("*all") or ""
-				cmdhandle:close()
-			else
-				e.cmdline = ""
-			end
+			e.cmdline = (safe_read_file("/proc/" .. pid .. "/cmdline") or ""):gsub("%z", " ")
 
 			-- 检查是否使用配置文件启动，配置内容随本次响应一起返回，前端无需再请求一次
 			if e.cmdline:match("%-%-config%-file") or e.cmdline:match("%-c%s+/") then
@@ -715,8 +769,7 @@ function act_conninfo()
 		if want_local.cmdline then
 			e.cmdline = errMsg
 		end
-		-- 未运行时清掉缓存，避免下次启动后读到旧的错误输出
-		luci.sys.call("rm -rf " .. CONNINFO_CACHE_DIR)
+		-- Caches belong to a PID/start-time identity; a restarted core cannot reuse them.
 	end
 
 	luci.http.prepare_content("application/json")

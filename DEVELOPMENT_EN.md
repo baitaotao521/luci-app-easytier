@@ -370,7 +370,15 @@ A: Cannot be compatible with older versions of OpenWrt, and JS frameworks are no
 A: These frameworks require build tools and have large file sizes, unsuitable for embedded environments.
 
 ### Q: How to implement dynamic updates?
-A: Use XMLHttpRequest + setInterval polling, or WebSocket (requires additional support).
+A: Use native `XMLHttpRequest` and schedule the next update with `setTimeout` after completion to prevent overlapping slow requests. Status updates every 5 seconds; only the visible connection section updates every 10 seconds (60 seconds for STUN). Polling pauses while the page is hidden. Interface/traffic requests run only while their panel is expanded.
+
+Status-page performance contracts:
+- Default `api_status` reads local `/proc` data and version caches without spawning commands. Only explicit `?versions=1` resolves missing versions.
+- CPU percentages are normalized to total machine capacity using persisted sample deltas; first samples and restarted processes show an unknown value.
+- `get_tun_info` uses native interface enumeration and sysfs counters without a shell.
+- `api_conninfo?parts=peer` runs only the requested section; omitted `parts` defaults to the device list. `refresh=1` bypasses the short cache. Cache entries are isolated by core PID and process start time.
+- The frontend permits at most two connection requests, without queuing abandoned sections. Normal sections reuse data for 10 seconds. Device snapshots are retained in browser-session storage for at most 60 seconds; startup arguments and configuration secrets are not stored.
+- Render at most 50 devices per page. Unchanged responses skip DOM updates; changed responses patch visible cells. Background updates preserve search, pagination and scroll position.
 
 ### Q: How to debug?
 A: Use browser developer tools, check Console and Network tabs.

@@ -119,6 +119,14 @@ Two configuration methods are supported:
 - **Logs** - View running logs with level filtering support
 - **Upload Program** - Upload and manage EasyTier binary files
 
+### Device List and Refreshing
+
+- The compact status dashboard opens on the device list. Returning to the page can immediately restore a browser-session snapshot from the last 60 seconds, then update it as needed.
+- Automatic refresh only updates the selected section: every 10 seconds normally, or 60 seconds for STUN. Disable Auto Refresh to pause it, or use Refresh manually. Polling pauses while the page is hidden.
+- Search and pagination run locally, with at most 50 devices per page. Background updates preserve the query, page and scroll position; failures retain the last data and show a warning.
+- Service status updates every 5 seconds. Version checks run independently without blocking devices; click a version to clear its cache and check again.
+- Expand the virtual-interface panel for interface details and live traffic. Collapsing it stops interface polling.
+
 ## 🛠️ Development Guide
 
 ### Tech Stack

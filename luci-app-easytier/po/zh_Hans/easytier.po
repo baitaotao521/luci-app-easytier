@@ -1,18 +1,18 @@
 msgid ""
-"A simple, secure, decentralized VPN solution for intranet penetration, "
-"implemented in Rust using the Tokio framework. Project URL: <a href="
-"\"https://github.com/EasyTier/EasyTier\" target=\"_blank\">github.com/"
-"EasyTier/EasyTier</a>&nbsp;&nbsp;<a href=\"http://easytier.cn\" target="
-"\"_blank\">Official Documentation</a>&nbsp;&nbsp;<a href=\"http://qm.qq.com/"
-"cgi-bin/qm/qr?"
-"_wv=1027&k=jhP2Z4UsEZ8wvfGPLrs0VwLKn_uz0Q_p&authKey=OGKSQLfg61YPCpVQuvx"
-"%2BxE7hUKBVBEVi9PljrDKbHlle6xqOXx8sOwPPTncMambK&noverify=0&group_code=949700262\" "
-"target=\"_blank\">QQ Group</a>&nbsp;&nbsp;">Beginner Tutorial</a>"
 msgstr ""
-"一个简单、安全、去中心化的内网穿透 VPN 组网方案，使用 Rust 语言和 Tokio 框架实现。 "
-"项目地址：<a href=\"https://github.com/EasyTier/EasyTier\" target=\"_blank\">github.com/EasyTier/EasyTier</a>&nbsp;&nbsp;"
-"<a href=\"http://easytier.cn\" target=\"_blank\">官网文档</a>&nbsp;&nbsp;"
-"<a href=\"http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=jhP2Z4UsEZ8wvfGPLrs0VwLKn_uz0Q_p&authKey=OGKSQLfg61YPCpVQuvx%2BxE7hUKBVBEVi9PljrDKbHlle6xqOXx8sOwPPTncMambK&noverify=0&group_code=949700262\" target=\"_blank\">QQ群</a>&nbsp;&nbsp;"
+"Project-Id-Version: luci-app-easytier\n"
+"PO-Revision-Date: 2026-10-27 00:00+0000\n"
+"Last-Translator: EasyTier contributors\n"
+"Language-Team: Simplified Chinese\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Manage services, connected devices and network diagnostics."
+msgstr "管理服务、已连接设备和网络诊断。"
+
 #: applications/luci-app-easytier/luasrc/model/cbi/easytier.lua:720
 msgid "API Port"
 msgstr "API端口"
@@ -2386,3 +2386,57 @@ msgstr "网关转发数据"
 
 msgid "Allow this web gateway instance to relay data traffic"
 msgstr "允许本 Web 网关实例转发数据流量"
+
+msgid "Overview"
+msgstr "运行概览"
+
+msgid "Refreshes every 5 seconds"
+msgstr "每 5 秒自动更新"
+
+msgid "Services running"
+msgstr "运行中的服务"
+
+msgid "Last updated"
+msgstr "上次更新"
+
+msgid "Unable to refresh status."
+msgstr "无法刷新运行状态。"
+
+msgid "Unable to refresh versions."
+msgstr "无法刷新版本信息。"
+
+msgid "Unable to refresh interface data."
+msgstr "无法获取网卡数据。"
+
+msgid "Operation failed. Please try again."
+msgstr "操作失败，请重试。"
+
+msgid "Connected Devices"
+msgstr "已连接设备"
+
+msgid "Live connections, routes and network diagnostics."
+msgstr "查看设备连接、路由与网络诊断，仅更新当前视图。"
+
+msgid "Search devices, addresses or IDs"
+msgstr "搜索设备、IP 地址或节点 ID"
+
+msgid "Devices"
+msgstr "设备"
+
+msgid "No matching devices"
+msgstr "没有匹配的设备"
+
+msgid "Previous"
+msgstr "上一页"
+
+msgid "Next"
+msgstr "下一页"
+
+msgid "Cached data"
+msgstr "缓存数据"
+
+msgid "Update failed. Showing the last available data."
+msgstr "更新失败，保留上次获取的数据。"
+
+msgid "Official Documentation"
+msgstr "官方文档"

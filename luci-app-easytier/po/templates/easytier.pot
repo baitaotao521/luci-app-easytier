@@ -1522,3 +1522,60 @@ msgstr ""
 
 msgid "Allow this web gateway instance to relay data traffic"
 msgstr ""
+
+msgid "Manage services, connected devices and network diagnostics."
+msgstr ""
+
+msgid "Overview"
+msgstr ""
+
+msgid "Refreshes every 5 seconds"
+msgstr ""
+
+msgid "Services running"
+msgstr ""
+
+msgid "Last updated"
+msgstr ""
+
+msgid "Unable to refresh status."
+msgstr ""
+
+msgid "Unable to refresh versions."
+msgstr ""
+
+msgid "Unable to refresh interface data."
+msgstr ""
+
+msgid "Operation failed. Please try again."
+msgstr ""
+
+msgid "Connected Devices"
+msgstr ""
+
+msgid "Live connections, routes and network diagnostics."
+msgstr ""
+
+msgid "Search devices, addresses or IDs"
+msgstr ""
+
+msgid "Devices"
+msgstr ""
+
+msgid "No matching devices"
+msgstr ""
+
+msgid "Previous"
+msgstr ""
+
+msgid "Next"
+msgstr ""
+
+msgid "Cached data"
+msgstr ""
+
+msgid "Update failed. Showing the last available data."
+msgstr ""
+
+msgid "Official Documentation"
+msgstr ""
